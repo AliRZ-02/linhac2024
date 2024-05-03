@@ -111,10 +111,20 @@ def add_sequence(seq, seq_start, seq_end):
         curr_time = df.loc[i, 'compiledgametime']
         curr_position = df.loc[i, 'playerprimaryposition']
         curr_event = df.loc[i, 'eventname']
+        curr_period = df.loc[i, 'period']
         event_outcome = df.loc[i, 'outcome']
         if i < plays and curr_team == team:
             next_time = df.loc[i + 1, 'compiledgametime']
-            time_diff = next_time - curr_time
+            next_game = df.loc[i + 1, 'gameid']
+            
+            if next_game != game:
+                if curr_period == 3:
+                    time_diff = 3600 - curr_time
+                elif curr_period == 4:
+                    time_diff = 3900 - curr_time
+                    
+            else:
+                time_diff = next_time - curr_time
             
             if curr_position == 'F':
                 fwd_time += time_diff
