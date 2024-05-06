@@ -1,0 +1,278 @@
+---
+title: "LinHac"
+author: "Xikai wu, Ryan Cao"
+date: "2024-04-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(cluster)
+library(dplyr)
+
+```
+
+```{r}
+df <- read.csv(file = "Linhac24_Sportlogiq.csv", header = TRUE)
+df_ozone_avgs <- read.csv(file = "ozone_averages.csv", header = TRUE)
+df_ozone_sequences <- read.csv(file = "ozone_sequences.csv", header = TRUE)
+```
+
+```{r}
+df <- df %>%
+  mutate(xg_allattempts = replace_na(xg_allattempts, 0))
+df_pass_between_shots=df %>% group_by(gameid) %>%
+  mutate(current_shot=cumsum(eventname=="shot"))%>%
+  #filter(eventname=="pass")#%>%
+  #group_by(gameid,current_shot)%>%
+  filter(eventname=="pass")%>%
+  add_count(gameid,current_shot,name="pass_between")
+df_pass_by_team=df%>% group_by(gameid)%>%
+  mutate(current_shot=cumsum(eventname=="shot"))%>%
+  filter(eventname=="pass")%>%
+  add_count(gameid,current_shot,teamid,name="pass_between")
+df_joined_passbetween=left_join(df,df_pass_between_shots)
+```
+
+```{r}
+df <- df %>%
+  mutate(xg_allattempts = replace_na(xg_allattempts, 0))
+teams=unique(df$teamid)
+#for (i in teams){
+#  df_pass_by_team%>%filter(teamid==i)%>%group_by(gameid,current_shot)
+#}
+temp=df_pass_by_team%>%filter(teamid==814)%>%group_by(gameid,current_shot)%>%summarize(pass_count=pass_between[1],teamid=teamid[1])
+
+
+
+## Try to figure out passes leading up to a shot
+df_possession_id <- df %>%
+  filter(!is.na(teaminpossession)) %>%
+  # Add filtering by manpowersituation column
+  filter(manpowersituation %in% c("evenStrength", "powerPlay", "shortHanded")) %>%
+  mutate(possession_id = cumsum(c(1, diff(teaminpossession) != 0)))
+
+## if a possession contain a shot attempt, then count number of passes within the posession that leads up to the shot
+containShot=function(event){
+  has_shot=(event=="shot")
+  if (sum(has_shot)>0){
+    return(rep(TRUE,length(event)))
+  }
+  else{
+    return(rep(FALSE,length(event)))
+  }
+}
+df_pass_betweenshot_per_possession=df_possession_id %>%
+  filter(has_shot==TRUE) %>%
+  group_by(possession_id) %>%
+  mutate(
+    pass_count=cumsum(eventname=="pass"),
+    time_since_possession=compiledgametime - compiledgametime[1]
+  ) %>%
+  filter(eventname=="shot") %>%
+  mutate(
+    passes_between_shots = pass_count - lag(pass_count, default = 0),
+    time_since_shot = time_since_possession - lag(time_since_possession, default = 0)
+  )
+
+df_pass_shot_clean = df_pass_betweenshot_per_possession %>%
+  select(
+    gameid,
+    teaminpossession,
+    possession_id,
+    eventname,
+    xg_allattempts,
+    outcome,
+    pass_count,
+    passes_between_shots,
+    time_since_possession,
+    time_since_shot
+  )
+```
+```{r}
+library(ggplot2)
+
+df_sampled <- df_pass_shot_clean %>% 
+  sample_frac(0.1)
+
+# Time Since Last Shot vs. Number of Passes Between Shots
+ggplot(df_sampled, aes(x = time_since_shot, y = passes_between_shots)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "lightblue") +
+  labs(title = "Time Since Last Shot vs. Number of Passes Between Shots (Sampled)",
+       x = "Time Since Last Shot (s)",
+       y = "Number of Passes Between Shots") +
+  theme_minimal()
+
+ggplot(df_pass_shot_clean, aes(x = time_since_shot, y = passes_between_shots, color = as.factor(teaminpossession))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = teaminpossession), color = "lightblue") +
+  labs(title = "Time Since Last Shot vs. Number of Passes Between Shots by Team",
+       x = "Time Since Last Shot (s)",
+       y = "Number of Passes Between Shots") +
+  theme_minimal()
+
+ggplot(df_pass_shot_clean, aes(x = time_since_shot, y = passes_between_shots, color = as.factor(teaminpossession))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = teaminpossession), color = "lightblue") +
+  labs(title = "Time Since Last Shot vs. Number of Passes Between Shots by Team",
+       x = "Time Since Last Shot (s)",
+       y = "Number of Passes Between Shots") +
+  facet_wrap(~ teaminpossession, scales = "free") +
+  theme_minimal()
+
+successful_data <- df_pass_shot_clean %>%
+  filter(outcome == "successful")
+
+ggplot(successful_data, aes(x = time_since_shot, y = passes_between_shots, color = as.factor(teaminpossession))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = teaminpossession), color = "lightblue") +
+  labs(title = "Successful Outcomes: Time Since Last Shot vs. Number of Passes Between Shots by Team",
+       x = "Time Since Last Shot (s)",
+       y = "Number of Passes Between Shots") +
+  facet_wrap(~ teaminpossession, scales = "free") +
+  theme_minimal()
+
+# Time Since Last Shot vs. Time Since Possession
+ggplot(df_sampled, aes(x = time_since_shot, y = time_since_possession)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "lightblue") +
+  labs(title = "Time Since Last Shot vs. Time Since Possession (Sampled)",
+       x = "Time Since Last Shot (s)",
+       y = "Time Since Possession (s)") +
+  theme_minimal()
+
+ggplot(df_pass_shot_clean, aes(x = time_since_shot, y = time_since_possession, color = as.factor(teaminpossession))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = teaminpossession), color = "lightblue") +
+  labs(title = "Time Since Last Shot vs. Time Since Possession by Team in Possession",
+       x = "Time Since Last Shot (s)",
+       y = "Time Since Possession (s)") +
+  theme_minimal()
+
+# Boxplot of Time Since Last Shot vs. Outcome
+ggplot(df_sampled, aes(x = outcome, y = time_since_shot)) +
+  geom_boxplot(fill = "lightblue", color = "darkblue", alpha = 0.7) +
+  labs(title = "Distribution of Time Since Last Shot by Outcome",
+       x = "Outcome",
+       y = "Time Since Last Shot (s)") +
+  theme_minimal()
+
+###
+```
+
+
+```{r}
+# Time Since Last Shot vs. Pass Count
+ggplot(df_sampled, aes(x = time_since_shot, y = pass_count)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, color = "lightblue") +
+  labs(title = "Time Since Last Shot vs. Pass Count (Sampled)",
+       x = "Time Since Last Shot (s)",
+       y = "Pass Count") +
+  theme_minimal()
+
+ggplot(df_pass_shot_clean, aes(x = time_since_shot, y = pass_count, color = as.factor(teaminpossession))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = teaminpossession), color = "lightblue") +
+  labs(title = "Time Since Last Shot vs. Pass Count by Team in Possession",
+       x = "Time Since Last Shot (s)",
+       y = "Pass Count") +
+  theme_minimal()
+
+
+df_pass_shot_clean <- df_pass_shot_clean %>%
+  mutate(
+    log_time_since_shot = log(time_since_shot + 0.1),  # Adding 0.1 to avoid log(0)
+    log_pass_count = log(pass_count + 1)  # Adding 1 to account for log(0)
+  )
+
+ggplot(df_pass_shot_clean, aes(x = log_time_since_shot, y = log_pass_count, color = as.factor(teaminpossession))) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, aes(group = teaminpossession), color = "lightblue") +
+  labs(title = "Log Transformed: Time Since Last Shot vs. Pass Count by Team in Possession",
+       x = "Log(Time Since Last Shot + 0.1)",
+       y = "Log(Pass Count + 1)") +
+  theme_minimal()
+
+# Correlation analysis
+correlation <- cor(df_pass_shot_clean$log_time_since_shot, df_pass_shot_clean$log_pass_count, use = "complete.obs")
+print(paste("Correlation coefficient:", correlation))
+
+# Linear regression analysis
+model <- lm(log_pass_count ~ log_time_since_shot, data = df_pass_shot_clean)
+summary(model)
+
+# Plotting residuals
+residuals_plot <- ggplot(model, aes(.fitted, .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Residuals vs Fitted Plot", x = "Fitted Values", y = "Residuals")
+print(residuals_plot)
+```
+
+```{r}
+df_cluster <- df_pass_shot_clean %>%
+  select(time_since_shot, passes_between_shots, time_since_possession, pass_count) %>%
+  scale()
+# Basic K-means clustering
+set.seed(123)
+k <- 3
+clust_results <- kmeans(df_cluster, centers = k, nstart = 25)
+
+
+df_pass_shot_clean$cluster <- clust_results$cluster
+
+ggplot(df_pass_shot_clean, aes(x = time_since_shot, y = passes_between_shots, color = as.factor(cluster))) +
+  geom_point(alpha = 0.5) +
+  labs(title = "Cluster by Time Since Last Shot and Passes Between Shots",
+       x = "Time Since Last Shot (s)",
+       y = "Number of Passes Between Shots") +
+  scale_color_discrete(name = "Cluster") +
+  theme_minimal()
+
+sil_width <- silhouette(clust_results$cluster, dist(df_cluster))
+summary(sil_width)
+
+
+cluster_p1 <- ggplot(df_pass_shot_clean, aes(x = time_since_shot, fill = as.factor(cluster))) +
+  geom_histogram(bins = 30, alpha = 0.6) +
+  facet_wrap(~ cluster) +
+  labs(title = "Distribution of Time Since Last Shot by Cluster")
+
+cluster_p2 <- ggplot(df_pass_shot_clean, aes(x = passes_between_shots, fill = as.factor(cluster))) +
+  geom_histogram(bins = 30, alpha = 0.6) +
+  facet_wrap(~ cluster) +
+  labs(title = "Distribution of Passes Between Shots by Cluster")
+
+gridExtra::grid.arrange(cluster_p1, cluster_p2, nrow = 2)
+
+```
+```{r}
+df_cluster2 <- df_sampled %>%
+  select(time_since_shot, passes_between_shots, time_since_possession, pass_count) %>%
+  scale()
+
+set.seed(123)  # Ensure reproducibility
+k <- 3  # Number of clusters
+kmeans_result <- kmeans(df_cluster2, centers = k, nstart = 25)
+
+# Add cluster labels back to the sampled data
+df_sampled$cluster <- kmeans_result$cluster
+
+ggplot(df_sampled, aes(x = time_since_shot, y = passes_between_shots, color = as.factor(cluster))) +
+  geom_point(alpha = 0.5) +
+  labs(title = "Cluster of Plays by Time Since Last Shot and Passes Between Shots",
+       x = "Time Since Last Shot (s)",
+       y = "Number of Passes Between Shots") +
+  scale_color_manual(values = c("red", "green", "blue")) +
+  theme_minimal()
+library(cluster)
+
+# Compute the distance matrix from the standardized data used in clustering
+dist_matrix <- dist(df_cluster)
+
+```
+
