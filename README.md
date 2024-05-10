@@ -12,21 +12,21 @@ hockey analytics · spatiotemporal data · sports statistics
 ```bash
 ├── csv_results/
 │   ├── data_clustered.csv // Final Averaged & Merged Team Metrics & Associated Clusters
-    ├── ozone_averages.csv // Initial O-zone Averaged Metrics
-    ├── summary_stat_by_cluster.csv // Final Averaged & Merged Cluster Metrics
+│   ├── ozone_averages.csv // Initial O-zone Averaged Metrics
+│   ├── summary_stat_by_cluster.csv // Final Averaged & Merged Cluster Metrics
 ├── eda/
-    ├── outputs/
-        ├── plot.png // Initial EDA Heatmap for passes
-        ├── plot2.png // Initial EDA Heatmap for pass vectors
-    ├── eda.ipynb // Exploratory Data Analysis for O-Zone event sequences
-    ├── hockey_rink.png // Image needed to create heatmap in EDA
-    ├── Ice_hockey_layout.svg // Image needed to create heatmap in EDA
-    ├── summarizedLINHAC2024Data.csv // Summarized O-Zone Data about in-depth shot quality
+│   ├── outputs/
+│   │   ├── plot.png // Initial EDA Heatmap for passes
+│   │   ├── plot2.png // Initial EDA Heatmap for pass vectors
+│   ├── eda.ipynb // Exploratory Data Analysis for O-Zone event sequences
+│   ├── hockey_rink.png // Image needed to create heatmap in EDA
+│   ├── Ice_hockey_layout.svg // Image needed to create heatmap in EDA
+│   ├── summarizedLINHAC2024Data.csv // Summarized O-Zone Data about in-depth shot quality
 ├── final_scripts/
-    ├── linhac_clustering.Rmd // R Markdown script used to generate clusters
-    ├── LinHac.Rmd // R Markdown script to generate aggregated o-zone metrics for time and passes between shots
-    ├── ozone_dequence_mapping.py // Python script to generate aggregated o-zone metrics for shot quality, positive o-zone events, etc.
-    ├── tables.R // R script to generate table graphics for final paper
+│   ├── linhac_clustering.Rmd // R Markdown script used to generate clusters
+│   ├── LinHac.Rmd // R Markdown script to generate aggregated o-zone metrics for time and passes between shots
+│   ├── ozone_dequence_mapping.py // Python script to generate aggregated o-zone metrics for shot quality, positive o-zone events, etc.
+│   ├── tables.R // R script to generate table graphics for final paper
 ├── .gitignore // Miscellaneous
 ├── LICENSE // Miscellaneous
 ├── README.md // Miscellaneous
