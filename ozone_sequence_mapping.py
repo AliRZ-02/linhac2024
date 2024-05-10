@@ -1,4 +1,6 @@
 ## Linhac 2024
+## Fauzan Lodhi
+## University of Waterloo
 
 import pandas as pd
 from scipy import stats
