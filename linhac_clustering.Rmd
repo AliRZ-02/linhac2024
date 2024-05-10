@@ -1,0 +1,134 @@
+---
+title: "LinHac_Clustering"
+author: "Sky Wu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup}
+library(graph)
+library(loon)
+library(tidyverse)
+library(PairViz)
+library(zenplots)
+library(dbscan)
+library(mclust)
+library(factoextra)
+```
+```{r data}
+df_sky=read.csv("var_for_clustering.csv")
+df_fz=read.csv("ozone_averages.csv")
+df_sky_clean=df_sky%>%mutate(team=teaminpossession)%>%select(team,mean_time,mean_time_mod,mean_pass,mean_pass_mod)
+df=full_join(df_sky_clean,df_fz,by = join_by(team))
+```
+
+After reading data from both source and combine into df, lets do analysis with loon.
+
+## Try PCA
+
+```{r}
+pca_result=prcomp(df,scale. = T)
+summary(pca_result)
+plot(pca_result, type = "l", main = "Scree Plot")
+reduced_df=pca_result$x[,1:5]
+pca_result$x
+elbowMethod=function(k,data){
+  vector_wcss=c()
+  for (i in 1:k){
+    k_means_result=kmeans(data,centers=k)
+    wcss=sum(k_means_result$withins)
+    vector_wcss=c(vector_wcss,wcss)
+  }
+  return(vector_wcss)
+}
+ng <- l_navgraph(reduced_df)
+cluster_result=data.frame(team=df$team,visual_manual=as.numeric(factor(ng["color"]$plot)))
+df[ng["selected"]$plot,]
+```
+
+```{r hierarchical}
+df_scaled=scale(df)
+df_dist=dist(df_scaled)
+hier_out=hclust(df_dist,method="complete")
+plot(hier_out)
+cluster_hier=cutree(hier_out,k=3)
+cluster_result$hierarchical=cluster_hier
+```
+
+```{r kmeans}
+k_means_result=kmeans(df_scaled,centers=3)
+cluster_result$kmeans=k_means_result$cluster
+```
+
+```{r dbscan}
+dbscan_result = dbscan(df_scaled, eps = 3.7, minPts = 3)
+dbscan_result
+```
+dbscan does not work well....
+
+```{r gmm}
+gmm_result=Mclust(df_scaled[,2:17])
+gmm_result_6=Mclust(df_scaled[,2:17],G=6)
+gmm_result_5=Mclust(df_scaled[,2:17],G=5)
+gmm_cluster=gmm_result$classification
+cluster_result$gmm= gmm_cluster
+cluster_result$gmm_6=gmm_result_6$classification
+cluster_result$gmm_5=gmm_result_5$classification
+gmm_result_5$BIC
+runmclust=function(data){
+  bic=data.frame(team=data[,1])
+  dis=dist(data[,2:17])^2
+for (i in 2:10){
+  gmm=Mclust(data[,2:17],G=i)
+  sil=silhouette(gmm$classification,dis)
+  #print(sil)
+  #bic=c(bic,sil)
+  bic[,paste0(i,"clusters")]=sil[,"sil_width"]
+  #plot(sil)
+}
+  return(bic)
+}
+sil_df=runmclust(data=df_scaled)
+cluster_result$gmm_7=Mclust(df_scaled[,2:17],G=7)$classification
+gmm_result_6$classification
+plot(gmm_result, what = "BIC", ylim = range(gmm_result$BIC[,-(1:2)], na.rm = TRUE),
+legendArgs = list(x = "bottomleft"))
+```
+
+noticed that the clusters are errily similar to manual ones
+
+```{r final}
+gmm_manual=cluster_result%>%select(team,visual_manual,gmm_6)
+gmm_5_manual=cluster_result%>%select(team,visual_manual,gmm_5)
+gmm_5_manual$visual_manual <- ifelse(gmm_5_manual$visual_manual == 6, 7, gmm_5_manual$visual_manual)
+gmm_5_manual$visual_manual <- ifelse(gmm_5_manual$visual_manual == 1, 8, gmm_5_manual$visual_manual)
+gmm_5_manual$visual_manual <- ifelse(gmm_5_manual$visual_manual == 3, 9, gmm_5_manual$visual_manual)
+gmm_5_manual$visual_manual <- ifelse(gmm_5_manual$visual_manual == 4, 10, gmm_5_manual$visual_manual)
+gmm_5_manual$visual_manual <- ifelse(gmm_5_manual$visual_manual == 5, 11, gmm_5_manual$visual_manual)
+gmm_5_manual$visual_manual <- ifelse(gmm_5_manual$visual_manual == 2, 12, gmm_5_manual$visual_manual)
+gmm_5_manual$gmm_5 <- ifelse(gmm_5_manual$gmm_5 == 1, 7, gmm_5_manual$gmm_5)
+gmm_5_manual$gmm_5 <- ifelse(gmm_5_manual$gmm_5 == 2, 8, gmm_5_manual$gmm_5)
+gmm_5_manual$gmm_5 <- ifelse(gmm_5_manual$gmm_5 == 3, 9, gmm_5_manual$gmm_5)
+gmm_5_manual$gmm_5 <- ifelse(gmm_5_manual$gmm_5 == 4, 11, gmm_5_manual$gmm_5)
+gmm_5_manual$gmm_5 <- ifelse(gmm_5_manual$gmm_5 == 5, 10, gmm_5_manual$gmm_5)
+gmm_5_manual$gmm_5 <- ifelse(gmm_5_manual$gmm_5 == 6, 12, gmm_5_manual$gmm_5)
+gmm_and_manual=gmm_5_manual-6
+gmm_and_manual$team=gmm_and_manual$team+6
+gmm_and_manual$isSame=gmm_and_manual$visual_manual==gmm_and_manual$gmm_5
+
+#write.csv(gmm_and_manual,"onlyGMMandManual.csv")
+#write.csv(cluster_result,"result_all_methods.csv")
+```
+
+lets use gmm_6 clusters for now
+
+```{r}
+df$clusters=gmm_and_manual$gmm_5
+summary_by_cluster=df%>%group_by(clusters)%>%summarize(across(everything(), mean, na.rm=TRUE))%>%select(-team)
+df_scaled=data.frame(df_scaled)
+df_scaled$team=df$team
+df_scaled$clusters=gmm_and_manual$gmm_5
+#write.csv(df_scaled,"data_clustered.csv")
+#write.csv(summary_by_cluster,"summary_stat_by_cluster.csv")
+
+```
