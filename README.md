@@ -1,5 +1,5 @@
 # UWAGGS LINHAC 2024
-[LINHAC](https://www.ida.liu.se/research/sportsanalytics/LINHAC/LINHAC24/home.html) is an event geared in bringing together the world of hockey analytics. Our team, formed from members of the University of Waterloo Analytics Group for Games and Sports (UWAGGS), analyzed offensive zone possessions to categorize SHL teams within the 2023-24 season based on their offensive-zone playstyle.
+[LINHAC](https://www.ida.liu.se/research/sportsanalytics/LINHAC/LINHAC24/home.html) is an event geared in bringing together the world of hockey analytics. Our team, formed from members of the [University of Waterloo Analytics Group for Games and Sports (UWAGGS)](https://www.uwaggs.ca), analyzed offensive zone possessions to categorize SHL teams within the 2023-24 season based on their offensive-zone playstyle.
 
 ## Abstract
 Advance scouting is essential to adequately prepare teams for
